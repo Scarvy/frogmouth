@@ -41,6 +41,7 @@ Welcome to {APPLICATION_TITLE} Help!
 | Key | Command |
 | -- | -- |
 | `Ctrl+d` | Add the current document to the bookmarks |
+| `Ctrl+g` | Import GitHub stars | 
 | `Ctrl+r` | Reload the current document |
 | `Ctrl+q` | Quit the application |
 | `F1` | This help |

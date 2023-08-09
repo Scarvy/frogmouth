@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime
+from typing import List
 from httpx import URL, AsyncClient, HTTPStatusError, RequestError
 
 from .advertising import USER_AGENT
@@ -179,3 +182,78 @@ async def build_raw_codeberg_url(
         branch,
         desired_file,
     )
+
+
+async def _import_github_repo_details(username, total_repos=None):
+    """Fetches repository details of starred repositories for a given GitHub user.
+
+    Args:
+        username (str): GitHub account username.
+        total_repos (int, optional): The maximum number of repositories to fetch details for.
+
+    Returns:
+        List[dict] | None: A list of dictionaries containing repository details
+        (owner, repo_name, starred_at), or None if the request fails or no repositories are found.
+    """
+    repo_details = []
+
+    next_page_of_results = f"https://api.github.com/users/{username}/starred"
+
+    async with AsyncClient() as client:
+        while next_page_of_results:
+            try:
+                response = await client.get(
+                    next_page_of_results,
+                    headers={"Accept": "application/vnd.github.v3.star+json"},
+                )
+
+                next_page_of_results = response.links.get("next", {}).get("url")
+
+                response.raise_for_status()
+                stars_response = response.json()
+
+                for repo_info in stars_response:
+                    repo = repo_info["repo"]
+
+                    timestamp = datetime.strptime(
+                        repo_info["starred_at"], "%Y-%m-%dT%H:%M:%SZ"
+                    )
+
+                    details = {
+                        "owner": repo["owner"]["login"],
+                        "repo_name": repo["name"],
+                        "starred_at": timestamp,
+                    }
+                    repo_details.append(details)
+
+                    if total_repos is not None and len(repo_details) >= total_repos:
+                        break  # Stop if we have fetched the desired number of repositories
+
+                if total_repos is not None and len(repo_details) >= total_repos:
+                    break  # Stop if we have fetched the desired number of repositories
+
+            except (RequestError, HTTPStatusError):
+                # Handle request errors or HTTP status errors here
+                return None
+
+    return repo_details
+
+
+async def import_github_stars(username, total_repos=None) -> List[URL]:
+    """Fetches GitHub raw URLs of starred repositories for a given GitHub user.
+
+    Args:
+        username (str): GitHub account username.
+        total_repos (int, optional): The maximum number of repositories to fetch URLs for.
+
+    Returns:
+        List[URL]: A list of GitHub raw URLs for the starred repositories.
+    """
+    repo_details = await _import_github_repo_details(username, total_repos)
+
+    build_tasks = [
+        build_raw_github_url(repo["owner"], repo["repo_name"]) for repo in repo_details
+    ]
+    urls = await asyncio.gather(*build_tasks)
+
+    return urls

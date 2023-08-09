@@ -23,6 +23,7 @@ from ..utility import (
     build_raw_codeberg_url,
     build_raw_github_url,
     build_raw_gitlab_url,
+    import_github_stars,
     is_likely_url,
     maybe_markdown,
 )
@@ -75,6 +76,7 @@ class Main(Screen[None]):  # pylint:disable=too-many-public-methods
         Binding("/,:", "omnibox", "Omnibox", show=False),
         Binding("ctrl+b", "bookmarks", "", show=False),
         Binding("ctrl+d", "bookmark_this", "", show=False),
+        Binding("ctrl+g", "github_stars", "", show=False),
         Binding("ctrl+l", "local_files", "", show=False),
         Binding("ctrl+left", "backward", "", show=False),
         Binding("ctrl+right", "forward", "", show=False),
@@ -509,6 +511,12 @@ class Main(Screen[None]):  # pylint:disable=too-many-public-methods
         """
         self.query_one(Navigation).bookmarks.add_bookmark(bookmark, location)
 
+    async def add_github_stars(self, username) -> None:
+        urls = await import_github_stars(username)
+
+        for url in urls:
+            self.add_bookmark(url, "README.md")
+
     def action_bookmark_this(self) -> None:
         """Add a bookmark for the currently-viewed file."""
 
@@ -534,6 +542,10 @@ class Main(Screen[None]):  # pylint:disable=too-many-public-methods
             InputDialog("Bookmark title:", title),
             partial(self.add_bookmark, location),
         )
+
+    def action_github_stars(self) -> None:
+        """Import gtihub stars (bookmarks) from a GitHub account."""
+        self.app.push_screen(InputDialog("GitHub username:"), self.add_github_stars)
 
     def action_toggle_theme(self) -> None:
         """Toggle the light/dark mode theme."""
